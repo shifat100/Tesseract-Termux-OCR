@@ -100,20 +100,11 @@ hin
 osd
 urd`
 
-## 13. Create the OCR Folder
-Create a folder named ocr in your current Termux directory:
-``
-mkdir -p ./ocr
-``
-Check it:
-`ls`
-You should have:
-ocr
 ## 14. Put Your PDF Files Inside the OCR Folder
 Your folder should look like this:
 ```
 .
-├── ocr/
+├── internal/ocr/
 │   ├── book.pdf
 │   ├── document.pdf
 │   └── bangla.pdf
@@ -122,4 +113,27 @@ Your folder should look like this:
 Run:
 ```bash
 nano ocr.sh
+```
+
+Paste the following script:
+
+```bash
+```
+
+## 16. Save the Script
+In nano:
+```bash
+CTRL + X
+Y
+ENTER
+```
+## 17. Make the Script Executable
+Run:
+```bash
+chmod +x ocr.sh
+```
+## 18. Run the OCR Script
+Run:
+```bash
+./ocr.sh
 ```
