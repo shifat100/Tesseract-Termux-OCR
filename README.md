@@ -102,9 +102,11 @@ urd`
 
 ## 13. Create the OCR Folder
 Create a folder named ocr in your current Termux directory:
+``
 mkdir -p ./ocr
+``
 Check it:
-ls
+`ls`
 You should have:
 ocr
 ## 14. Put Your PDF Files Inside the OCR Folder
