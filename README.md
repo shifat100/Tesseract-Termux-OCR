@@ -748,6 +748,6 @@ Run:
 ./ocr.sh
 ```
 
-Screenshot (Running):
+## 19.Screenshot (Running):
 
 [![Tesseract OCR](https://raw.githubusercontent.com/shifat100/Tesseract-Termux-OCR/refs/heads/main/Screenshot_2026-09-03-07-27-15-328_com.termux.jpg)](https://shifat100.xtgem.com)
