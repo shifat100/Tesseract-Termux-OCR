@@ -729,7 +729,7 @@ while true; do
     esac
 done
 ```
-
+~ [Note: for updated script please copy from `ocr.sh` file in this repository] ~
 ## 16. Save the Script
 In nano:
 ```bash
