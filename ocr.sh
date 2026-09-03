@@ -1,18 +1,18 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ============================================================
-# PDF OCR TOOL FOR TERMUX
+# PDF OCR TOOL FOR TERMUX (ADVANCED MULTI-LANGUAGE EDITION)
 #
 # Storage Directory:
 # /storage/emulated/0/ocr/
 #
 # Features:
-# 1. Main navigation menu with Back and Exit options
-# 2. Individual PDF OCR or Batch "Convert All" processing
-# 3. All pages / Custom range selection (e.g. 1-5, 1,6,8, 1-5,8,12-15)
-# 4. Multi-language OCR support (auto-detects installed models)
-# 5. Live progress bar for both conversion and OCR stages
-# 6. Automatic cleanup of temporary image files & graceful exit handling
+# 1. Interactive Language Selector (Single, Multiple Combo, or All)
+# 2. Main navigation menu with Back & Exit options
+# 3. Individual PDF OCR or Batch "Convert All" processing
+# 4. All pages / Custom range selection (e.g. 1-5, 1,6,8, 1-5,8,12-15)
+# 5. Live progress bar for Conversion and OCR stages
+# 6. Temporary files auto-cleanup & interruption trap handling
 # ============================================================
 
 set -u
@@ -46,7 +46,6 @@ trap cleanup_on_exit EXIT INT TERM
 if [ ! -d "/storage/emulated/0" ]; then
     echo
     echo -e "${RED}[ERROR] Android storage permission not granted.${NC}"
-    echo
     echo "Please grant permission by running:"
     echo "  termux-setup-storage"
     exit 1
@@ -79,16 +78,106 @@ if [ "${#MISSING_TOOLS[@]}" -gt 0 ]; then
 fi
 
 # ============================================================
-# DETECT OCR LANGUAGES
+# DETECT & INITIALIZE OCR LANGUAGES
 # ============================================================
-LANGS=$(tesseract --list-langs 2>/dev/null | grep -Ev "(List of available|^osd$|:)" | paste -sd+ -)
+INSTALLED_LANGS=()
+while IFS= read -r line; do
+    line=$(echo "$line" | tr -d ' \r\n')
+    if [[ -n "$line" && ! "$line" =~ (List|osd|:) ]]; then
+        INSTALLED_LANGS+=("$line")
+    fi
+done < <(tesseract --list-langs 2>/dev/null)
 
-if [ -z "$LANGS" ]; then
+if [ "${#INSTALLED_LANGS[@]}" -eq 0 ]; then
     echo
-    echo -e "${RED}[ERROR] No Tesseract language traineddata found.${NC}"
-    echo "Install a language model (e.g., pkg install tesseract-lang-eng tesseract-lang-ben)"
+    echo -e "${RED}[ERROR] No Tesseract language models found.${NC}"
+    echo "Please install language data (e.g., pkg install tesseract-lang-eng tesseract-lang-ben)"
     exit 1
 fi
+
+# Set default active language
+SELECTED_LANGS=$(printf "%s+" "${INSTALLED_LANGS[@]}")
+SELECTED_LANGS="${SELECTED_LANGS%+}"
+
+# ============================================================
+# LANGUAGE SELECTION MENU
+# ============================================================
+select_languages_menu() {
+    while true; do
+        clear
+        echo "============================================================"
+        echo "                 LANGUAGE SELECTION MENU                    "
+        echo "============================================================"
+        echo -e "Currently Active Language(s): ${CYAN}${BOLD}${SELECTED_LANGS}${NC}"
+        echo "------------------------------------------------------------"
+        echo "Available Installed Languages:"
+        echo
+        local idx=1
+        for lang in "${INSTALLED_LANGS[@]}"; do
+            echo "  $idx) $lang"
+            ((idx++))
+        done
+        echo
+        echo "------------------------------------------------------------"
+        echo "  A) Select ALL available languages"
+        echo "  0) Back to Main Menu"
+        echo "------------------------------------------------------------"
+        echo "Selection Examples:"
+        echo "  Single language    : 1"
+        echo "  Multiple (combined): 1,2 or 1,3"
+        echo
+        read -r -p "Enter choice [e.g., 1 or 1,2 or A / 0]: " LANG_CHOICE
+
+        case "$LANG_CHOICE" in
+            0|b|B)
+                return 0
+                ;;
+            a|A)
+                SELECTED_LANGS=$(printf "%s+" "${INSTALLED_LANGS[@]}")
+                SELECTED_LANGS="${SELECTED_LANGS%+}"
+                echo -e "\n${GREEN}[✓] Selected all languages: $SELECTED_LANGS${NC}"
+                sleep 1.2
+                return 0
+                ;;
+            *)
+                local VALID=true
+                local TEMP_SELECTION=()
+
+                local OLD_IFS="$IFS"
+                IFS=','
+                read -r -a CHOSEN_INDICES <<< "$LANG_CHOICE"
+                IFS="$OLD_IFS"
+
+                for c_idx in "${CHOSEN_INDICES[@]}"; do
+                    c_idx=$(echo "$c_idx" | tr -d ' ')
+                    if [[ "$c_idx" =~ ^[0-9]+$ ]] && [ "$c_idx" -ge 1 ] && [ "$c_idx" -le "${#INSTALLED_LANGS[@]}" ]; then
+                        TEMP_SELECTION+=("${INSTALLED_LANGS[$((c_idx - 1))]}")
+                    else
+                        VALID=false
+                        break
+                    fi
+                done
+
+                if [ "$VALID" = true ] && [ "${#TEMP_SELECTION[@]}" -gt 0 ]; then
+                    # Remove duplicates
+                    local OLD_IFS2="$IFS"
+                    IFS=$'\n'
+                    local UNIQUE_SELECTION=($(printf '%s\n' "${TEMP_SELECTION[@]}" | sort -u))
+                    IFS="$OLD_IFS2"
+
+                    SELECTED_LANGS=$(printf "%s+" "${UNIQUE_SELECTION[@]}")
+                    SELECTED_LANGS="${SELECTED_LANGS%+}"
+                    echo -e "\n${GREEN}[✓] Active language(s) set to: $SELECTED_LANGS${NC}"
+                    sleep 1.2
+                    return 0
+                else
+                    echo -e "\n${RED}[ERROR] Invalid input. Please select valid numbers.${NC}"
+                    sleep 1.2
+                fi
+                ;;
+        esac
+    done
+}
 
 # ============================================================
 # PROGRESS BAR FUNCTION
@@ -129,7 +218,6 @@ parse_pages() {
     local TOTAL="$2"
     SELECTED_PAGES=()
 
-    # Strip all spaces
     INPUT=$(echo "$INPUT" | tr -d ' ')
     [ -z "$INPUT" ] && return 1
 
@@ -139,7 +227,7 @@ parse_pages() {
     IFS="$OLD_IFS"
 
     for PART in "${PARTS[@]}"; do
-        # Page range format (e.g. 1-5)
+        # Range: 1-5
         if [[ "$PART" =~ ^([0-9]+)-([0-9]+)$ ]]; then
             local START="${BASH_REMATCH[1]}"
             local END="${BASH_REMATCH[2]}"
@@ -158,7 +246,7 @@ parse_pages() {
                 SELECTED_PAGES+=("$P")
             done
 
-        # Single page format (e.g. 8)
+        # Single page: 8
         elif [[ "$PART" =~ ^[0-9]+$ ]]; then
             local P="$PART"
             if [ "$P" -lt 1 ] || [ "$P" -gt "$TOTAL" ]; then
@@ -170,12 +258,11 @@ parse_pages() {
         fi
     done
 
-    # Remove duplicates and sort numerically
     if [ "${#SELECTED_PAGES[@]}" -gt 0 ]; then
-        local OLD_IFS="$IFS"
+        local OLD_IFS2="$IFS"
         IFS=$'\n'
         SELECTED_PAGES=($(printf '%s\n' "${SELECTED_PAGES[@]}" | sort -n -u))
-        IFS="$OLD_IFS"
+        IFS="$OLD_IFS2"
     fi
 
     return 0
@@ -240,7 +327,7 @@ select_pages() {
                 done
                 ;;
             0|b|B)
-                return 2  # Signal back to menu
+                return 2
                 ;;
             *)
                 echo -e "${YELLOW}Please select 0, 1, or 2.${NC}"
@@ -269,7 +356,8 @@ process_pdf() {
 
     echo
     echo "============================================================"
-    echo -e "Processing PDF: ${CYAN}$BASENAME${NC}"
+    echo -e "Processing PDF : ${CYAN}$BASENAME${NC}"
+    echo -e "Active OCR Lang: ${YELLOW}$SELECTED_LANGS${NC}"
     echo "============================================================"
 
     if [ "$AUTO_ALL_PAGES" = true ]; then
@@ -317,7 +405,7 @@ process_pdf() {
     echo -e "${GREEN}[✓] Page image conversion complete.${NC}\n"
 
     # Step 2: OCR
-    echo -e "${CYAN}[2/3] Extracting text via OCR...${NC}"
+    echo -e "${CYAN}[2/3] Extracting text with Tesseract ($SELECTED_LANGS)...${NC}"
     : > "$MERGED"
     local OCR_DONE=0
 
@@ -330,7 +418,7 @@ process_pdf() {
             continue
         fi
 
-        tesseract "$IMAGE" "${PAGE_TXT%.txt}" -l "$LANGS" --oem 1 --psm 3 >/dev/null 2>&1
+        tesseract "$IMAGE" "${PAGE_TXT%.txt}" -l "$SELECTED_LANGS" --oem 1 --psm 3 >/dev/null 2>&1
 
         {
             echo "================================================"
@@ -346,7 +434,7 @@ process_pdf() {
     echo
     echo -e "${GREEN}[✓] Text recognition (OCR) complete.${NC}\n"
 
-    # Step 3: Cleanup temporary images
+    # Step 3: Cleanup
     echo -e "${CYAN}[3/3] Cleaning up temporary image files...${NC}"
     rm -rf "$IMAGE_DIR"
     CURRENT_TEMP_DIR=""
@@ -357,10 +445,11 @@ process_pdf() {
     echo "============================================================"
     echo -e "${GREEN}✓ PDF OCR COMPLETED SUCCESSFULLY${NC}"
     echo "============================================================"
-    echo -e "Source File   : $BASENAME"
+    echo -e "Source File     : $BASENAME"
+    echo -e "Language Used   : $SELECTED_LANGS"
     echo -e "Pages Processed : $SELECTED_COUNT"
-    echo -e "Merged Text   : ${BOLD}$MERGED${NC}"
-    echo -e "Page Text Dir : ${BOLD}$TEXT_DIR/${NC}"
+    echo -e "Merged Text File: ${BOLD}$MERGED${NC}"
+    echo -e "Individual Files: ${BOLD}$TEXT_DIR/${NC}"
     echo "============================================================"
 }
 
@@ -374,8 +463,8 @@ while true; do
     echo "============================================================"
     echo "                   PDF OCR TOOL (TERMUX)                    "
     echo "============================================================"
-    echo -e "Directory : ${CYAN}$OCR_ROOT${NC}"
-    echo -e "Languages : ${CYAN}$LANGS${NC}"
+    echo -e "Directory    : ${CYAN}$OCR_ROOT${NC}"
+    echo -e "Active Lang  : ${GREEN}${BOLD}$SELECTED_LANGS${NC} (Press 'L' to select/change)"
     echo "------------------------------------------------------------"
 
     TOTAL_FILES="${#PDF_LIST[@]}"
@@ -384,14 +473,19 @@ while true; do
         echo -e "${YELLOW}No PDF files found in the folder.${NC}"
         echo -e "Place your PDF files inside: ${BOLD}$OCR_ROOT${NC}"
         echo
+        echo "L) Change OCR Language(s)"
         echo "R) Refresh File List"
         echo "0) Exit Tool"
         echo
-        read -r -p "Option [R/0]: " EMPTY_CHOICE
+        read -r -p "Option [L/R/0]: " EMPTY_CHOICE
         case "$EMPTY_CHOICE" in
             0|q|Q)
                 echo -e "\n${GREEN}Goodbye!${NC}\n"
                 exit 0
+                ;;
+            l|L)
+                select_languages_menu
+                continue
                 ;;
             *)
                 continue
@@ -409,16 +503,20 @@ while true; do
 
     echo "------------------------------------------------------------"
     echo "A) Convert All PDFs"
+    echo "L) Select / Change OCR Language(s)"
     echo "R) Refresh File List"
     echo "0) Exit"
     echo "------------------------------------------------------------"
 
-    read -r -p "Select PDF [1-$TOTAL_FILES / A / 0]: " CHOICE
+    read -r -p "Select option [1-$TOTAL_FILES / A / L / 0]: " CHOICE
 
     case "$CHOICE" in
         0|q|Q)
             echo -e "\n${GREEN}Goodbye!${NC}\n"
             exit 0
+            ;;
+        l|L)
+            select_languages_menu
             ;;
         r|R)
             continue
