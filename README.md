@@ -109,21 +109,21 @@ urd`
 
 Tesseract cannot recognize every language automatically unless the corresponding language data is installed.
 
-```
-ben = Bengali
-eng = English
-ara = Arabic
-hin = Hindi
-urd = Urdu
-fra = French
-deu = German
-spa = Spanish
-por = Portuguese
-rus = Russian
-jpn = Japanese
-kor = Korean
-chi_sim = Simplified Chinese
-```
+
+* ben = Bengali
+* eng = English
+* ara = Arabic
+* hin = Hindi
+* urd = Urdu
+* fra = French
+* deu = German
+* spa = Spanish
+* por = Portuguese
+* rus = Russian
+* jpn = Japanese
+* kor = Korean
+* chi_sim = Simplified Chinese
+
 
 ## 14. Put Your PDF Files Inside the OCR Folder
 Your folder should look like this:
@@ -134,6 +134,12 @@ Your folder should look like this:
 │   ├── document.pdf
 │   └── bangla.pdf
 ```
+
+You can change the path in `ocr.sh` script 
+```
+OCR_ROOT="YOUR_FOLDER_PATH"
+```
+
 ## 15. Create the OCR Script
 Run:
 ```bash
