@@ -748,4 +748,4 @@ Run:
 ./ocr.sh
 ```
 
-[![Tesseract OCR](Screenshot_2026-09-03-07-27-15-328_com.termux.jpg)](https://shifat100.xtgem.com)
+[![Tesseract OCR](Screenshot%202026-09-03-07-27-15-328%20com.termux.jpg)](https://shifat100.xtgem.com)
